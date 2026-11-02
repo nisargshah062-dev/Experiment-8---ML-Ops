@@ -1,0 +1,5 @@
+fastapi==0.121.0
+uvicorn==0.34.0
+prometheus-client==0.21.1
+scikit-learn==1.6.1
+joblib==1.4.2
