@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iris-api
+  namespace: mlops
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: iris-api
+  template:
+    metadata:
+      labels:
+        app: iris-api
+    spec:
+      containers:
+        - name: iris-api
+          image: iris-api:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iris-api
+  namespace: mlops
+spec:
+  type: NodePort
+  selector:
+    app: iris-api
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
+---
+# Headless service so Prometheus can discover and scrape each pod separately.
+apiVersion: v1
+kind: Service
+metadata:
+  name: iris-api-headless
+  namespace: mlops
+spec:
+  clusterIP: None
+  selector:
+    app: iris-api
+  ports:
+    - port: 8000
