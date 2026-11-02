@@ -1,0 +1,11 @@
+.venv
+.git
+.github
+__pycache__
+.pytest_cache
+model
+k8s
+monitoring
+tests
+scripts
+submission
