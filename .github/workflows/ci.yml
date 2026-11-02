@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Lint
+        run: flake8 src tests streamlit_app.py scripts
+      - name: Train model
+        run: python -m src.train
+      - name: Run tests
+        run: pytest -v
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t iris-api:ci .
+      - name: Smoke test container
+        run: |
+          docker run -d --name iris -p 8000:8000 iris-api:ci
+          sleep 5
+          curl --fail http://localhost:8000/health
+          curl --fail -X POST http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+      - name: Push image to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag iris-api:ci "$IMAGE:latest"
+          docker tag iris-api:ci "$IMAGE:${GITHUB_SHA::7}"
+          docker push --all-tags "$IMAGE"
